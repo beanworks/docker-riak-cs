@@ -49,6 +49,7 @@ function riak_cs_patch_config(){
     cat <<-EOL > $advancedConfigPath
 		[
 		    {riak_cs, [
+		        {auth_v4_enabled, true},
 		        {anonymous_user_creation, true},
 		        %%{admin_key, null},
 		        %%{admin_secret, null},
