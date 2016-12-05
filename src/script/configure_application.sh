@@ -136,25 +136,33 @@ function riak_cs_create_admin(){
             # Because we call this right after starting riak services, this sometimes fails with 500 status,
             # probably because it needs some time to warm up. This allows several attempts with delays.
 
-            credentials=$(curl \
-                --connect-timeout 5 \
-                --fail \
-                --header 'Content-Type: application/json' \
-                --insecure \
-                --request POST 'http://127.0.0.1:8080/riak-cs/user' \
-                --retry 10 \
-                --retry-delay 5 \
-                --silent \
-                --data '{"email":"admin@s3.amazonaws.dev", "name":"admin"}')
+            while true; do
 
-            local key_access=$(echo -n $credentials | pcregrep -o '"key_id"\h*:\h*"\K([^"]*)')
-            local key_secret=$(echo -n $credentials | pcregrep -o '"key_secret"\h*:\h*"\K([^"]*)')
+                local username=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+                local json=$(echo '{"email":"'$username'@s3.amazonaws.dev", "name":"'$username'"}')
 
-            if [ -z "${key_access}" ] || [ -z "${key_secret}" ]; then
-                echo "Could not create admin user and retrieve credentials. Curl got response:"
-                echo "${credentials}"
-                exit 1
-            fi
+                credentials=$(curl \
+                    --connect-timeout 5 \
+                    --fail \
+                    --header 'Content-Type: application/json' \
+                    --insecure \
+                    --request POST 'http://127.0.0.1:8080/riak-cs/user' \
+                    --retry 10 \
+                    --retry-delay 5 \
+                    --silent \
+                    --data "$json")
+
+                local key_access=$(echo -n $credentials | pcregrep -o '"key_id"\h*:\h*"\K([^"]*)')
+                local key_secret=$(echo -n $credentials | pcregrep -o '"key_secret"\h*:\h*"\K([^"]*)')
+
+                if [ -z "${key_access}" ] || [ -z "${key_secret}" ]; then
+                    sleep 1
+                else
+                    break
+                fi
+
+            done
+
         fi
 
         patchConfig "${riakCsConfigPath}" '\Q{anonymous_user_creation, true}\E' '{anonymous_user_creation, false}'
